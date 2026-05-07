@@ -8,7 +8,9 @@ void main() {
   ) async {
     await tester.pumpWidget(const CashFlowApp());
 
-    expect(find.text('Cash Flow Anual'), findsOneWidget);
+    expect(find.text('Parametros'), findsOneWidget);
+    expect(find.text('Ingresos total'), findsOneWidget);
+    expect(find.text('Mes act.'), findsOneWidget);
     expect(find.text('Ingresos'), findsOneWidget);
     expect(find.text('Gastos fijos'), findsOneWidget);
     expect(find.text('Gastos variables'), findsOneWidget);

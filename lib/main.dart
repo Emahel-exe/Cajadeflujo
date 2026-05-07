@@ -49,6 +49,9 @@ class _CashFlowPageState extends State<CashFlowPage> {
   static const double monthColumnWidth = 90;
   int selectedMonthIndex = 4;
   int inputResetVersion = 0;
+  int cashValue = 0;
+  int bankValue = 0;
+  int objectiveValue = 0;
 
   final List<String> months = const [
     'Ene',
@@ -209,68 +212,70 @@ class _CashFlowPageState extends State<CashFlowPage> {
     final accumulatedBalance = _accumulatedTotals(monthlyBalance);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Cash Flow Anual'),
-        actions: [
-          SizedBox(
-            width: 150,
-            child: DropdownButtonFormField<int>(
-              value: selectedMonthIndex,
-              decoration: const InputDecoration(
-                labelText: 'Mes actual',
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(horizontal: 8),
-              ),
-              items: List.generate(months.length, (index) {
-                return DropdownMenuItem(
-                  value: index,
-                  child: Text(months[index]),
-                );
-              }),
-              onChanged: (value) {
-                if (value == null) return;
-                setState(() => selectedMonthIndex = value);
-              },
-            ),
-          ),
-          IconButton(
-            tooltip: 'Eliminar todos los datos',
-            onPressed: _clearAllData,
-            icon: const Icon(Icons.delete_outline),
-          ),
-        ],
-      ),
       body: SafeArea(
-        child: ListView(
+        child: Padding(
           padding: const EdgeInsets.all(16),
-          children: [
-            _SummaryPanel(
-              yearlyIncome: monthlyIncome.fold(0, (sum, value) => sum + value),
-              yearlyExpenses:
-                  monthlyFixed.fold(0, (sum, value) => sum + value) +
-                  monthlyVariable.fold(0, (sum, value) => sum + value),
-              bestMonth: _monthPeak(monthlyBalance, true),
-              worstMonth: _monthPeak(monthlyBalance, false),
-            ),
-            const SizedBox(height: 16),
-            _CashFlowTable(
-              months: months,
-              rows: rows,
-              monthlyIncome: monthlyIncome,
-              monthlyFixed: monthlyFixed,
-              monthlyVariable: monthlyVariable,
-              monthlyBalance: monthlyBalance,
-              accumulatedBalance: accumulatedBalance,
-              selectedMonthIndex: selectedMonthIndex,
-              inputResetVersion: inputResetVersion,
-              onValueChanged: (rowIndex, monthIndex, value) {
-                setState(() => rows[rowIndex].values[monthIndex] = value);
-              },
-              onControlValueChanged: (rowIndex, value) {
-                setState(() => rows[rowIndex].controlValue = value);
-              },
-            ),
-          ],
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _ParametersPanel(
+                cashValue: cashValue,
+                bankValue: bankValue,
+                objectiveValue: objectiveValue,
+                inputResetVersion: inputResetVersion,
+                onCashChanged: (value) => setState(() => cashValue = value),
+                onBankChanged: (value) => setState(() => bankValue = value),
+                onObjectiveChanged: (value) =>
+                    setState(() => objectiveValue = value),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  children: [
+                    _DashboardHeader(
+                      yearlyIncome: monthlyIncome.fold(
+                        0,
+                        (sum, value) => sum + value,
+                      ),
+                      yearlyExpenses:
+                          monthlyFixed.fold(0, (sum, value) => sum + value) +
+                          monthlyVariable.fold(0, (sum, value) => sum + value),
+                      projection: accumulatedBalance.last,
+                      months: months,
+                      selectedMonthIndex: selectedMonthIndex,
+                      onMonthChanged: (value) {
+                        if (value == null) return;
+                        setState(() => selectedMonthIndex = value);
+                      },
+                      onClear: _clearAllData,
+                    ),
+                    const SizedBox(height: 14),
+                    Expanded(
+                      child: _CashFlowTable(
+                        months: months,
+                        rows: rows,
+                        monthlyIncome: monthlyIncome,
+                        monthlyFixed: monthlyFixed,
+                        monthlyVariable: monthlyVariable,
+                        monthlyBalance: monthlyBalance,
+                        accumulatedBalance: accumulatedBalance,
+                        selectedMonthIndex: selectedMonthIndex,
+                        inputResetVersion: inputResetVersion,
+                        onValueChanged: (rowIndex, monthIndex, value) {
+                          setState(
+                            () => rows[rowIndex].values[monthIndex] = value,
+                          );
+                        },
+                        onControlValueChanged: (rowIndex, value) {
+                          setState(() => rows[rowIndex].controlValue = value);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -278,6 +283,9 @@ class _CashFlowPageState extends State<CashFlowPage> {
 
   void _clearAllData() {
     setState(() {
+      cashValue = 0;
+      bankValue = 0;
+      objectiveValue = 0;
       for (final row in rows) {
         for (var i = 0; i < row.values.length; i++) {
           row.values[i] = 0;
@@ -309,14 +317,6 @@ class _CashFlowPageState extends State<CashFlowPage> {
       return runningTotal;
     }).toList();
   }
-
-  String _monthPeak(List<int> balances, bool best) {
-    final target = balances.reduce(
-      best ? (a, b) => a > b ? a : b : (a, b) => a < b ? a : b,
-    );
-    final index = balances.indexOf(target);
-    return '${months[index]} ${_formatMoney(target)}';
-  }
 }
 
 enum CashFlowGroup { income, fixedExpense, variableExpense }
@@ -335,98 +335,303 @@ class CashFlowRow {
   int controlValue;
 }
 
-class _SummaryPanel extends StatelessWidget {
-  const _SummaryPanel({
-    required this.yearlyIncome,
-    required this.yearlyExpenses,
-    required this.bestMonth,
-    required this.worstMonth,
+class _ParametersPanel extends StatelessWidget {
+  const _ParametersPanel({
+    required this.cashValue,
+    required this.bankValue,
+    required this.objectiveValue,
+    required this.inputResetVersion,
+    required this.onCashChanged,
+    required this.onBankChanged,
+    required this.onObjectiveChanged,
   });
 
-  final int yearlyIncome;
-  final int yearlyExpenses;
-  final String bestMonth;
-  final String worstMonth;
+  final int cashValue;
+  final int bankValue;
+  final int objectiveValue;
+  final int inputResetVersion;
+  final ValueChanged<int> onCashChanged;
+  final ValueChanged<int> onBankChanged;
+  final ValueChanged<int> onObjectiveChanged;
 
   @override
   Widget build(BuildContext context) {
-    final balance = yearlyIncome - yearlyExpenses;
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
+    return SizedBox(
+      width: 150,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF111827),
+          border: Border.all(color: const Color(0xFF334155), width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Parametros',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: const Color(0xFFE5E7EB),
+                ),
+              ),
+              const SizedBox(height: 28),
+              _ParameterInput(
+                label: 'Efectivo',
+                value: cashValue,
+                resetVersion: inputResetVersion,
+                onChanged: onCashChanged,
+              ),
+              const SizedBox(height: 24),
+              _ParameterInput(
+                label: 'Banco',
+                value: bankValue,
+                resetVersion: inputResetVersion,
+                onChanged: onBankChanged,
+              ),
+              const SizedBox(height: 24),
+              _ReadOnlyMetric(label: 'Total', value: cashValue + bankValue),
+              const SizedBox(height: 24),
+              _ParameterInput(
+                label: 'Objetivo',
+                value: objectiveValue,
+                resetVersion: inputResetVersion,
+                onChanged: onObjectiveChanged,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ParameterInput extends StatelessWidget {
+  const _ParameterInput({
+    required this.label,
+    required this.value,
+    required this.resetVersion,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final int resetVersion;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SummaryCard(
-          title: 'Ingresos anuales',
-          value: _formatMoney(yearlyIncome),
-          icon: Icons.trending_up,
-          color: const Color(0xFF36D399),
-        ),
-        _SummaryCard(
-          title: 'Gastos anuales',
-          value: _formatMoney(yearlyExpenses),
-          icon: Icons.receipt_long,
-          color: const Color(0xFFF87171),
-        ),
-        _SummaryCard(
-          title: 'Saldo proyectado',
-          value: _formatMoney(balance),
-          icon: Icons.account_balance_wallet_outlined,
-          color: balance >= 0
-              ? const Color(0xFF60A5FA)
-              : const Color(0xFFF87171),
-        ),
-        _SummaryCard(
-          title: 'Mejor / peor mes',
-          value: '$bestMonth / $worstMonth',
-          icon: Icons.calendar_month_outlined,
-          color: const Color(0xFFC084FC),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        _MiniInput(
+          key: ValueKey('$resetVersion-$label'),
+          initialValue: value,
+          onChanged: onChanged,
         ),
       ],
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _ReadOnlyMetric extends StatelessWidget {
+  const _ReadOnlyMetric({required this.label, required this.value});
+
+  final String label;
+  final int value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8),
+        Container(
+          height: 38,
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0B1020),
+            border: Border.all(color: const Color(0xFF475569), width: 1.5),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            _formatMoney(value),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniInput extends StatelessWidget {
+  const _MiniInput({
+    super.key,
+    required this.initialValue,
+    required this.onChanged,
+  });
+
+  final int initialValue;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 38,
+      child: TextFormField(
+        initialValue: initialValue.toString(),
+        textAlign: TextAlign.right,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: const Color(0xFF0B1020),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: Color(0xFF475569), width: 1.5),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: Color(0xFF475569), width: 1.5),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: const BorderSide(color: Color(0xFF36D399), width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        style: const TextStyle(fontSize: 12),
+        cursorColor: const Color(0xFF36D399),
+        onChanged: (value) => onChanged(_parseMoney(value)),
+      ),
+    );
+  }
+}
+
+class _DashboardHeader extends StatelessWidget {
+  const _DashboardHeader({
+    required this.yearlyIncome,
+    required this.yearlyExpenses,
+    required this.projection,
+    required this.months,
+    required this.selectedMonthIndex,
+    required this.onMonthChanged,
+    required this.onClear,
+  });
+
+  final int yearlyIncome;
+  final int yearlyExpenses;
+  final int projection;
+  final List<String> months;
+  final int selectedMonthIndex;
+  final ValueChanged<int?> onMonthChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 94,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _HeaderMetric(
+              title: 'Ingresos total',
+              value: _formatMoney(yearlyIncome),
+              color: const Color(0xFF36D399),
+            ),
+            const SizedBox(width: 14),
+            _HeaderMetric(
+              title: 'Gastos total',
+              value: _formatMoney(yearlyExpenses),
+              color: const Color(0xFFF87171),
+            ),
+            const SizedBox(width: 14),
+            _HeaderMetric(
+              title: 'Proyeccion',
+              value: _formatMoney(projection),
+              color: projection >= 0
+                  ? const Color(0xFF60A5FA)
+                  : const Color(0xFFF87171),
+            ),
+            const SizedBox(width: 64),
+            SizedBox(
+              width: 170,
+              child: DropdownButtonFormField<int>(
+                initialValue: selectedMonthIndex,
+                decoration: InputDecoration(
+                  labelText: 'Mes act.',
+                  filled: true,
+                  fillColor: const Color(0xFF111827),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                items: List.generate(months.length, (index) {
+                  return DropdownMenuItem(
+                    value: index,
+                    child: Text(months[index]),
+                  );
+                }),
+                onChanged: onMonthChanged,
+              ),
+            ),
+            const SizedBox(width: 18),
+            IconButton.filledTonal(
+              tooltip: 'Eliminar todos los datos',
+              onPressed: onClear,
+              icon: const Icon(Icons.delete_outline),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderMetric extends StatelessWidget {
+  const _HeaderMetric({
     required this.title,
     required this.value,
-    required this.icon,
     required this.color,
   });
 
   final String title;
   final String value;
-  final IconData icon;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 260,
-      child: Card(
-        elevation: 0,
+      width: 200,
+      height: 78,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFF111827),
+          border: Border.all(color: const Color(0xFF334155), width: 2),
+          borderRadius: BorderRadius.circular(6),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 30),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: Theme.of(context).textTheme.labelLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      value,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: color,
-                      ),
-                    ),
-                  ],
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
                 ),
               ),
             ],
@@ -492,60 +697,62 @@ class _CashFlowTableState extends State<_CashFlowTable> {
             width:
                 _CashFlowPageState.categoryColumnWidth +
                 (_CashFlowPageState.monthColumnWidth * 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HeaderRow(months: widget.months),
-                const _SectionTitle(
-                  title: 'Ingresos',
-                  color: Color(0xFF064E3B),
-                ),
-                ..._rowsFor(CashFlowGroup.income),
-                _TotalRow(
-                  label: 'Total ingresos',
-                  values: widget.monthlyIncome,
-                  controlValue: _controlTotal(CashFlowGroup.income),
-                  color: const Color(0xFF12392F),
-                ),
-                const _SectionTitle(
-                  title: 'Gastos fijos',
-                  color: Color(0xFF7F1D1D),
-                ),
-                ..._rowsFor(CashFlowGroup.fixedExpense),
-                _TotalRow(
-                  label: 'Total gastos fijos',
-                  values: widget.monthlyFixed,
-                  controlValue: _controlTotal(CashFlowGroup.fixedExpense),
-                  color: const Color(0xFF3B1D22),
-                ),
-                const _SectionTitle(
-                  title: 'Gastos variables',
-                  color: Color(0xFF713F12),
-                ),
-                ..._rowsFor(CashFlowGroup.variableExpense),
-                _TotalRow(
-                  label: 'Total gastos variables',
-                  values: widget.monthlyVariable,
-                  controlValue: _controlTotal(CashFlowGroup.variableExpense),
-                  color: const Color(0xFF3F2F14),
-                ),
-                _TotalRow(
-                  label: 'Flujo neto del mes',
-                  values: widget.monthlyBalance,
-                  controlValue:
-                      _controlTotal(CashFlowGroup.income) -
-                      _controlTotal(CashFlowGroup.fixedExpense) -
-                      _controlTotal(CashFlowGroup.variableExpense),
-                  color: const Color(0xFF1E3A5F),
-                  highlightBalance: true,
-                ),
-                _TotalRow(
-                  label: 'Flujo neto acumulado',
-                  values: widget.accumulatedBalance,
-                  color: const Color(0xFF312E81),
-                  highlightBalance: true,
-                ),
-              ],
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeaderRow(months: widget.months),
+                  const _SectionTitle(
+                    title: 'Ingresos',
+                    color: Color(0xFF064E3B),
+                  ),
+                  ..._rowsFor(CashFlowGroup.income),
+                  _TotalRow(
+                    label: 'Total ingresos',
+                    values: widget.monthlyIncome,
+                    controlValue: _controlTotal(CashFlowGroup.income),
+                    color: const Color(0xFF12392F),
+                  ),
+                  const _SectionTitle(
+                    title: 'Gastos fijos',
+                    color: Color(0xFF7F1D1D),
+                  ),
+                  ..._rowsFor(CashFlowGroup.fixedExpense),
+                  _TotalRow(
+                    label: 'Total gastos fijos',
+                    values: widget.monthlyFixed,
+                    controlValue: _controlTotal(CashFlowGroup.fixedExpense),
+                    color: const Color(0xFF3B1D22),
+                  ),
+                  const _SectionTitle(
+                    title: 'Gastos variables',
+                    color: Color(0xFF713F12),
+                  ),
+                  ..._rowsFor(CashFlowGroup.variableExpense),
+                  _TotalRow(
+                    label: 'Total gastos variables',
+                    values: widget.monthlyVariable,
+                    controlValue: _controlTotal(CashFlowGroup.variableExpense),
+                    color: const Color(0xFF3F2F14),
+                  ),
+                  _TotalRow(
+                    label: 'Flujo neto del mes',
+                    values: widget.monthlyBalance,
+                    controlValue:
+                        _controlTotal(CashFlowGroup.income) -
+                        _controlTotal(CashFlowGroup.fixedExpense) -
+                        _controlTotal(CashFlowGroup.variableExpense),
+                    color: const Color(0xFF1E3A5F),
+                    highlightBalance: true,
+                  ),
+                  _TotalRow(
+                    label: 'Flujo neto acumulado',
+                    values: widget.accumulatedBalance,
+                    color: const Color(0xFF312E81),
+                    highlightBalance: true,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
