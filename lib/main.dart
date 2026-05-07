@@ -701,55 +701,64 @@ class _CashFlowTableState extends State<_CashFlowTable> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _HeaderRow(months: widget.months),
+                  const _YearRow(year: '2026'),
+                  _HeaderRow(
+                    months: widget.months,
+                    selectedMonthIndex: widget.selectedMonthIndex,
+                  ),
                   const _SectionTitle(
-                    title: 'Ingresos',
-                    color: Color(0xFF064E3B),
+                    title: 'INGRESOS',
+                    color: Color(0xFFE2F0D9),
                   ),
                   ..._rowsFor(CashFlowGroup.income),
                   _TotalRow(
-                    label: 'Total ingresos',
+                    label: 'TOTAL INGRESO',
                     values: widget.monthlyIncome,
                     controlValue: _controlTotal(CashFlowGroup.income),
-                    color: const Color(0xFF12392F),
+                    color: const Color(0xFFDDEBF7),
+                    selectedMonthIndex: widget.selectedMonthIndex,
                   ),
                   const _SectionTitle(
-                    title: 'Gastos fijos',
-                    color: Color(0xFF7F1D1D),
+                    title: 'GASTOS FIJOS',
+                    color: Color(0xFFFFF2CC),
                   ),
                   ..._rowsFor(CashFlowGroup.fixedExpense),
                   _TotalRow(
-                    label: 'Total gastos fijos',
+                    label: 'TOTAL GASTOS FIJOS',
                     values: widget.monthlyFixed,
                     controlValue: _controlTotal(CashFlowGroup.fixedExpense),
-                    color: const Color(0xFF3B1D22),
+                    color: const Color(0xFFDDEBF7),
+                    selectedMonthIndex: widget.selectedMonthIndex,
                   ),
                   const _SectionTitle(
-                    title: 'Gastos variables',
-                    color: Color(0xFF713F12),
+                    title: 'GASTOS VARIABLES',
+                    color: Color(0xFFFCE4D6),
                   ),
                   ..._rowsFor(CashFlowGroup.variableExpense),
                   _TotalRow(
-                    label: 'Total gastos variables',
+                    label: 'TOTAL GASTOS VARIABLES',
                     values: widget.monthlyVariable,
                     controlValue: _controlTotal(CashFlowGroup.variableExpense),
-                    color: const Color(0xFF3F2F14),
+                    color: const Color(0xFFDDEBF7),
+                    selectedMonthIndex: widget.selectedMonthIndex,
                   ),
                   _TotalRow(
-                    label: 'Flujo neto del mes',
+                    label: 'FLUJO MES',
                     values: widget.monthlyBalance,
                     controlValue:
                         _controlTotal(CashFlowGroup.income) -
                         _controlTotal(CashFlowGroup.fixedExpense) -
                         _controlTotal(CashFlowGroup.variableExpense),
-                    color: const Color(0xFF1E3A5F),
+                    color: const Color(0xFFDDEBF7),
                     highlightBalance: true,
+                    selectedMonthIndex: widget.selectedMonthIndex,
                   ),
                   _TotalRow(
-                    label: 'Flujo neto acumulado',
+                    label: 'FLUJO ACUMULADO + AHRR',
                     values: widget.accumulatedBalance,
-                    color: const Color(0xFF312E81),
+                    color: const Color(0xFFDDEBF7),
                     highlightBalance: true,
+                    selectedMonthIndex: widget.selectedMonthIndex,
                   ),
                 ],
               ),
@@ -769,6 +778,7 @@ class _CashFlowTableState extends State<_CashFlowTable> {
           return _EditableTableRow(
             rowIndex: entry.key,
             row: entry.value,
+            rowColor: _rowColor(group),
             selectedMonthIndex: widget.selectedMonthIndex,
             inputResetVersion: widget.inputResetVersion,
             onValueChanged: widget.onValueChanged,
@@ -783,12 +793,50 @@ class _CashFlowTableState extends State<_CashFlowTable> {
         .where((row) => row.group == group)
         .fold(0, (sum, row) => sum + row.controlValue);
   }
+
+  Color _rowColor(CashFlowGroup group) {
+    return switch (group) {
+      CashFlowGroup.income => const Color(0xFFE2F0D9),
+      CashFlowGroup.fixedExpense => const Color(0xFFFFF2CC),
+      CashFlowGroup.variableExpense => const Color(0xFFFCE4D6),
+    };
+  }
+}
+
+class _YearRow extends StatelessWidget {
+  const _YearRow({required this.year});
+
+  final String year;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width:
+          _CashFlowPageState.categoryColumnWidth +
+          (_CashFlowPageState.monthColumnWidth * 14),
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        border: Border.all(color: Colors.black, width: 1),
+      ),
+      child: Text(
+        year,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
 }
 
 class _HeaderRow extends StatelessWidget {
-  const _HeaderRow({required this.months});
+  const _HeaderRow({required this.months, required this.selectedMonthIndex});
 
   final List<String> months;
+  final int selectedMonthIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -796,39 +844,55 @@ class _HeaderRow extends StatelessWidget {
       children: [
         const _TableCell(
           width: _CashFlowPageState.categoryColumnWidth,
-          color: Color(0xFF1F2937),
-          child: Text(
-            'Categoria',
-            style: TextStyle(fontWeight: FontWeight.w800),
-          ),
+          color: Color(0xFFFFFFFF),
+          child: Text('', style: TextStyle(fontWeight: FontWeight.w800)),
         ),
-        ...months.map(
-          (month) => _TableCell(
+        ...months.asMap().entries.map(
+          (entry) => _TableCell(
             width: _CashFlowPageState.monthColumnWidth,
-            color: const Color(0xFF1F2937),
+            color: entry.key == selectedMonthIndex
+                ? const Color(0xFFFFEB3B)
+                : const Color(0xFFFFFFFF),
             child: Text(
-              month,
+              _fullMonthName(entry.value),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: TextStyle(
+                color: entry.key == selectedMonthIndex
+                    ? const Color(0xFF111111)
+                    : const Color(0xFF111111),
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ),
         const _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
-          color: Color(0xFF1F2937),
+          color: Color(0xFFFFFFFF),
           child: Text(
             'Mes control',
             textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Color(0xFF111111),
+              fontSize: 10,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
         const _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
-          color: Color(0xFF1F2937),
+          color: Color(0xFFFFFFFF),
           child: Text(
             'Total',
             textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.w800),
+            style: TextStyle(
+              color: Color(0xFF111111),
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
       ],
@@ -845,12 +909,19 @@ class _SectionTitle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 42,
+      height: 24,
       width: double.infinity,
       color: color,
       alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFF111111),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
     );
   }
 }
@@ -859,6 +930,7 @@ class _EditableTableRow extends StatelessWidget {
   const _EditableTableRow({
     required this.rowIndex,
     required this.row,
+    required this.rowColor,
     required this.selectedMonthIndex,
     required this.inputResetVersion,
     required this.onValueChanged,
@@ -867,6 +939,7 @@ class _EditableTableRow extends StatelessWidget {
 
   final int rowIndex;
   final CashFlowRow row;
+  final Color rowColor;
   final int selectedMonthIndex;
   final int inputResetVersion;
   final void Function(int rowIndex, int monthIndex, int value) onValueChanged;
@@ -878,9 +951,14 @@ class _EditableTableRow extends StatelessWidget {
       children: [
         _TableCell(
           width: _CashFlowPageState.categoryColumnWidth,
+          color: rowColor,
           child: Text(
             row.label,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Color(0xFF111111),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         ...List.generate(row.values.length, (monthIndex) {
@@ -888,7 +966,7 @@ class _EditableTableRow extends StatelessWidget {
 
           return _TableCell(
             width: _CashFlowPageState.monthColumnWidth,
-            color: isSelectedMonth ? const Color(0xFF172554) : null,
+            color: isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor,
             child: TextFormField(
               key: ValueKey('$inputResetVersion-$rowIndex-$monthIndex'),
               initialValue: row.values[monthIndex].toString(),
@@ -904,12 +982,12 @@ class _EditableTableRow extends StatelessWidget {
               ),
               style: TextStyle(
                 color: isSelectedMonth
-                    ? const Color(0xFFBFDBFE)
-                    : const Color(0xFFE5E7EB),
+                    ? const Color(0xFF111111)
+                    : const Color(0xFF111111),
                 fontSize: 12,
                 fontWeight: isSelectedMonth ? FontWeight.w800 : FontWeight.w400,
               ),
-              cursorColor: const Color(0xFF36D399),
+              cursorColor: const Color(0xFF111111),
               onChanged: (value) {
                 final parsed = _parseMoney(value);
                 onValueChanged(rowIndex, monthIndex, parsed);
@@ -919,7 +997,7 @@ class _EditableTableRow extends StatelessWidget {
         }),
         _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
-          color: const Color(0xFF0F766E),
+          color: const Color(0xFFD9EAD3),
           child: TextFormField(
             key: ValueKey('$inputResetVersion-$rowIndex-control'),
             initialValue: row.controlValue.toString(),
@@ -930,8 +1008,12 @@ class _EditableTableRow extends StatelessWidget {
               isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             ),
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            cursorColor: const Color(0xFF36D399),
+            style: const TextStyle(
+              color: Color(0xFF111111),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            cursorColor: const Color(0xFF111111),
             onChanged: (value) {
               onControlValueChanged(rowIndex, _parseMoney(value));
             },
@@ -939,6 +1021,7 @@ class _EditableTableRow extends StatelessWidget {
         ),
         _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
+          color: const Color(0xFFE7E6E6),
           child: Text(
             _formatMoney(
               row.values.asMap().entries.fold(0, (sum, entry) {
@@ -949,7 +1032,11 @@ class _EditableTableRow extends StatelessWidget {
               }),
             ),
             textAlign: TextAlign.right,
-            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+            style: const TextStyle(
+              color: Color(0xFF111111),
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ),
       ],
@@ -964,6 +1051,7 @@ class _TotalRow extends StatelessWidget {
     required this.color,
     this.controlValue,
     this.highlightBalance = false,
+    this.selectedMonthIndex,
   });
 
   final String label;
@@ -971,6 +1059,7 @@ class _TotalRow extends StatelessWidget {
   final Color color;
   final int? controlValue;
   final bool highlightBalance;
+  final int? selectedMonthIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -983,16 +1072,24 @@ class _TotalRow extends StatelessWidget {
             color: color,
             child: Text(
               label,
-              style: const TextStyle(fontWeight: FontWeight.w900),
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          ...values.map((value) {
+          ...values.asMap().entries.map((entry) {
+            final value = entry.value;
+            final isSelectedMonth = entry.key == selectedMonthIndex;
             final textColor = highlightBalance && value < 0
-                ? const Color(0xFFF87171)
-                : const Color(0xFFE5E7EB);
+                ? const Color(0xFFC00000)
+                : isSelectedMonth
+                ? const Color(0xFF111111)
+                : const Color(0xFF111111);
             return _TableCell(
               width: _CashFlowPageState.monthColumnWidth,
-              color: color,
+              color: isSelectedMonth ? const Color(0xFFFFEB3B) : color,
               child: Text(
                 _formatMoney(value),
                 textAlign: TextAlign.right,
@@ -1013,8 +1110,8 @@ class _TotalRow extends StatelessWidget {
               style: TextStyle(
                 fontWeight: FontWeight.w900,
                 color: highlightBalance && (controlValue ?? 0) < 0
-                    ? const Color(0xFFF87171)
-                    : const Color(0xFFE5E7EB),
+                    ? const Color(0xFFC00000)
+                    : const Color(0xFF111111),
                 fontSize: 12,
               ),
             ),
@@ -1025,7 +1122,11 @@ class _TotalRow extends StatelessWidget {
             child: Text(
               _formatMoney(values.fold(0, (sum, value) => sum + value)),
               textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontWeight: FontWeight.w900,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -1045,12 +1146,12 @@ class _TableCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
-      height: 44,
+      height: 24,
       alignment: Alignment.centerLeft,
-      padding: const EdgeInsets.symmetric(horizontal: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
       decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFE0E5E2), width: 0.7),
-        color: color ?? const Color(0xFF111827),
+        border: Border.all(color: Colors.black, width: 0.7),
+        color: color ?? const Color(0xFFFFFFFF),
       ),
       child: child,
     );
@@ -1059,6 +1160,24 @@ class _TableCell extends StatelessWidget {
 
 int _parseMoney(String value) {
   return int.tryParse(value.replaceAll('.', '').replaceAll(',', '')) ?? 0;
+}
+
+String _fullMonthName(String shortName) {
+  return switch (shortName) {
+    'Ene' => 'ENERO',
+    'Feb' => 'FEBRERO',
+    'Mar' => 'MARZO',
+    'Abr' => 'ABRIL',
+    'May' => 'MAYO',
+    'Jun' => 'JUNIO',
+    'Jul' => 'JULIO',
+    'Ago' => 'AGOSTO',
+    'Sep' => 'SEPTIEMBRE',
+    'Oct' => 'OCTUBRE',
+    'Nov' => 'NOVIEMBRE',
+    'Dic' => 'DICIEMBRE',
+    _ => shortName.toUpperCase(),
+  };
 }
 
 String _formatMoney(int value) {

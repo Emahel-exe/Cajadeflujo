@@ -11,9 +11,9 @@ void main() {
     expect(find.text('Parametros'), findsOneWidget);
     expect(find.text('Ingresos total'), findsOneWidget);
     expect(find.text('Mes act.'), findsOneWidget);
-    expect(find.text('Ingresos'), findsOneWidget);
-    expect(find.text('Gastos fijos'), findsOneWidget);
-    expect(find.text('Gastos variables'), findsOneWidget);
-    expect(find.text('Flujo neto del mes'), findsOneWidget);
+    expect(find.text('INGRESOS'), findsOneWidget);
+    expect(find.text('GASTOS FIJOS'), findsOneWidget);
+    expect(find.text('GASTOS VARIABLES'), findsOneWidget);
+    expect(find.text('FLUJO MES'), findsOneWidget);
   });
 }
