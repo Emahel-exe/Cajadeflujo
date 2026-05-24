@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'database_helper.dart';
 
 void main() {
   runApp(const CashFlowApp());
@@ -52,6 +53,7 @@ class _CashFlowPageState extends State<CashFlowPage> {
   int cashValue = 0;
   int bankValue = 0;
   int objectiveValue = 0;
+  bool isLoading = true;
 
   final List<String> months = const [
     'Ene',
@@ -68,139 +70,77 @@ class _CashFlowPageState extends State<CashFlowPage> {
     'Dic',
   ];
 
-  final List<CashFlowRow> rows = [
-    CashFlowRow(
-      label: 'Sueldo',
-      group: CashFlowGroup.income,
-      values: [
-        1850000,
-        1850000,
-        1850000,
-        1850000,
-        1900000,
-        1900000,
-        1900000,
-        1900000,
-        1950000,
-        1950000,
-        1950000,
-        1950000,
-      ],
-    ),
-    CashFlowRow(
-      label: 'Freelance / otros',
-      group: CashFlowGroup.income,
-      values: [
-        250000,
-        180000,
-        300000,
-        220000,
-        250000,
-        280000,
-        260000,
-        300000,
-        320000,
-        280000,
-        300000,
-        350000,
-      ],
-    ),
-    CashFlowRow(
-      label: 'Arriendo / dividendo',
-      group: CashFlowGroup.fixedExpense,
-      values: List.filled(12, 620000),
-    ),
-    CashFlowRow(
-      label: 'Servicios basicos',
-      group: CashFlowGroup.fixedExpense,
-      values: List.filled(12, 95000),
-    ),
-    CashFlowRow(
-      label: 'Internet y telefono',
-      group: CashFlowGroup.fixedExpense,
-      values: List.filled(12, 54000),
-    ),
-    CashFlowRow(
-      label: 'Seguros / suscripciones',
-      group: CashFlowGroup.fixedExpense,
-      values: List.filled(12, 78000),
-    ),
-    CashFlowRow(
-      label: 'Transporte',
-      group: CashFlowGroup.variableExpense,
-      values: [
-        120000,
-        115000,
-        130000,
-        125000,
-        110000,
-        120000,
-        135000,
-        140000,
-        125000,
-        120000,
-        130000,
-        150000,
-      ],
-    ),
-    CashFlowRow(
-      label: 'Comida',
-      group: CashFlowGroup.variableExpense,
-      values: [
-        360000,
-        340000,
-        380000,
-        370000,
-        365000,
-        390000,
-        410000,
-        400000,
-        380000,
-        390000,
-        420000,
-        460000,
-      ],
-    ),
-    CashFlowRow(
-      label: 'Salud',
-      group: CashFlowGroup.variableExpense,
-      values: [
-        40000,
-        55000,
-        35000,
-        80000,
-        45000,
-        50000,
-        65000,
-        45000,
-        55000,
-        70000,
-        50000,
-        60000,
-      ],
-    ),
-    CashFlowRow(
-      label: 'Ocio / regalos',
-      group: CashFlowGroup.variableExpense,
-      values: [
-        90000,
-        120000,
-        110000,
-        95000,
-        100000,
-        130000,
-        150000,
-        135000,
-        120000,
-        125000,
-        160000,
-        220000,
-      ],
-    ),
-  ];
+  List<CashFlowRow> rows = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData(showSpinner: true);
+  }
+
+  Future<void> _loadData({bool showSpinner = false}) async {
+    if (showSpinner) {
+      setState(() {
+        isLoading = true;
+      });
+    }
+
+    try {
+      final params = await DatabaseHelper.instance.loadParameters();
+      final rowMaps = await DatabaseHelper.instance.loadRows();
+
+      final List<CashFlowRow> loadedRows = [];
+      for (final map in rowMaps) {
+        final List<int> values = [];
+        for (var i = 0; i < 12; i++) {
+          values.add(map['val_$i'] as int? ?? 0);
+        }
+        
+        final groupStr = map['group_type'] as String;
+        final CashFlowGroup group = switch (groupStr) {
+          'income' => CashFlowGroup.income,
+          'fixedExpense' => CashFlowGroup.fixedExpense,
+          'variableExpense' => CashFlowGroup.variableExpense,
+          _ => CashFlowGroup.variableExpense,
+        };
+
+        loadedRows.add(
+          CashFlowRow(
+            id: map['id'] as int,
+            label: map['label'] as String,
+            group: group,
+            values: values,
+            controlValue: map['control_value'] as int? ?? 0,
+          ),
+        );
+      }
+
+      setState(() {
+        cashValue = params['cash'] ?? 0;
+        bankValue = params['bank'] ?? 0;
+        objectiveValue = params['objective'] ?? 0;
+        rows = loadedRows;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF36D399),
+          ),
+        ),
+      );
+    }
+
     final monthlyIncome = _monthlyTotals(CashFlowGroup.income);
     final monthlyFixed = _monthlyTotals(CashFlowGroup.fixedExpense);
     final monthlyVariable = _monthlyTotals(CashFlowGroup.variableExpense);
@@ -223,10 +163,18 @@ class _CashFlowPageState extends State<CashFlowPage> {
                 bankValue: bankValue,
                 objectiveValue: objectiveValue,
                 inputResetVersion: inputResetVersion,
-                onCashChanged: (value) => setState(() => cashValue = value),
-                onBankChanged: (value) => setState(() => bankValue = value),
-                onObjectiveChanged: (value) =>
-                    setState(() => objectiveValue = value),
+                onCashChanged: (value) {
+                  setState(() => cashValue = value);
+                  DatabaseHelper.instance.saveParameter('cash', value);
+                },
+                onBankChanged: (value) {
+                  setState(() => bankValue = value);
+                  DatabaseHelper.instance.saveParameter('bank', value);
+                },
+                onObjectiveChanged: (value) {
+                  setState(() => objectiveValue = value);
+                  DatabaseHelper.instance.saveParameter('objective', value);
+                },
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -262,12 +210,29 @@ class _CashFlowPageState extends State<CashFlowPage> {
                         selectedMonthIndex: selectedMonthIndex,
                         inputResetVersion: inputResetVersion,
                         onValueChanged: (rowIndex, monthIndex, value) {
-                          setState(
-                            () => rows[rowIndex].values[monthIndex] = value,
-                          );
+                          setState(() {
+                            rows[rowIndex].values[monthIndex] = value;
+                          });
+                          final rowId = rows[rowIndex].id;
+                          if (rowId != null) {
+                            DatabaseHelper.instance.saveRowMonthValue(
+                              rowId,
+                              monthIndex,
+                              value,
+                            );
+                          }
                         },
                         onControlValueChanged: (rowIndex, value) {
-                          setState(() => rows[rowIndex].controlValue = value);
+                          setState(() {
+                            rows[rowIndex].controlValue = value;
+                          });
+                          final rowId = rows[rowIndex].id;
+                          if (rowId != null) {
+                            DatabaseHelper.instance.saveRowControlValue(
+                              rowId,
+                              value,
+                            );
+                          }
                         },
                       ),
                     ),
@@ -281,17 +246,10 @@ class _CashFlowPageState extends State<CashFlowPage> {
     );
   }
 
-  void _clearAllData() {
+  Future<void> _clearAllData() async {
+    await DatabaseHelper.instance.resetAllData();
+    await _loadData(showSpinner: false);
     setState(() {
-      cashValue = 0;
-      bankValue = 0;
-      objectiveValue = 0;
-      for (final row in rows) {
-        for (var i = 0; i < row.values.length; i++) {
-          row.values[i] = 0;
-        }
-        row.controlValue = 0;
-      }
       inputResetVersion++;
     });
   }
@@ -323,12 +281,14 @@ enum CashFlowGroup { income, fixedExpense, variableExpense }
 
 class CashFlowRow {
   CashFlowRow({
+    this.id,
     required this.label,
     required this.group,
     required this.values,
     this.controlValue = 0,
   });
 
+  final int? id;
   final String label;
   final CashFlowGroup group;
   final List<int> values;
