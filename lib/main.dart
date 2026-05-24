@@ -3,6 +3,7 @@ import 'dart:math';
 import 'database_helper.dart';
 import 'package:velocity_x/velocity_x.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
 
 void main() {
   runApp(const CashFlowApp());
@@ -692,6 +693,8 @@ class _CashFlowTableState extends State<_CashFlowTable> {
   int? dragEndRowIndex;
   int? dragEndMonthIndex;
   int dragFillVersion = 0;
+  int? requestedFocusRowIndex;
+  int? requestedFocusMonthIndex;
 
   @override
   void didUpdateWidget(_CashFlowTable oldWidget) {
@@ -711,7 +714,63 @@ class _CashFlowTableState extends State<_CashFlowTable> {
     setState(() {
       activeRowIndex = rowIndex;
       activeMonthIndex = monthIndex;
+      requestedFocusRowIndex = null;
+      requestedFocusMonthIndex = null;
     });
+  }
+
+  List<int> get _visualRowIndices {
+    final List<int> indices = [];
+    for (var i = 0; i < widget.rows.length; i++) {
+      if (widget.rows[i].group == CashFlowGroup.income) {
+        indices.add(i);
+      }
+    }
+    for (var i = 0; i < widget.rows.length; i++) {
+      if (widget.rows[i].group == CashFlowGroup.fixedExpense) {
+        indices.add(i);
+      }
+    }
+    for (var i = 0; i < widget.rows.length; i++) {
+      if (widget.rows[i].group == CashFlowGroup.variableExpense) {
+        indices.add(i);
+      }
+    }
+    return indices;
+  }
+
+  void _handleDirectionalKey(int rowIndex, int monthIndex, LogicalKeyboardKey key) {
+    final visualIndices = _visualRowIndices;
+    final currentVisualRow = visualIndices.indexOf(rowIndex);
+    if (currentVisualRow == -1) return;
+
+    int targetRowIndex = rowIndex;
+    int targetMonthIndex = monthIndex;
+
+    if (key == LogicalKeyboardKey.arrowUp) {
+      if (currentVisualRow > 0) {
+        targetRowIndex = visualIndices[currentVisualRow - 1];
+      }
+    } else if (key == LogicalKeyboardKey.arrowDown) {
+      if (currentVisualRow < visualIndices.length - 1) {
+        targetRowIndex = visualIndices[currentVisualRow + 1];
+      }
+    } else if (key == LogicalKeyboardKey.arrowLeft) {
+      if (monthIndex > 0) {
+        targetMonthIndex = monthIndex - 1;
+      }
+    } else if (key == LogicalKeyboardKey.arrowRight) {
+      if (monthIndex < 11) {
+        targetMonthIndex = monthIndex + 1;
+      }
+    }
+
+    if (targetRowIndex != rowIndex || targetMonthIndex != monthIndex) {
+      setState(() {
+        requestedFocusRowIndex = targetRowIndex;
+        requestedFocusMonthIndex = targetMonthIndex;
+      });
+    }
   }
 
   void _handleDragUpdate(double dx, double dy) {
@@ -896,6 +955,9 @@ class _CashFlowTableState extends State<_CashFlowTable> {
             onDragHandle: _handleDragUpdate,
             onDragHandleEnd: _handleDragEnd,
             isCellInDragRange: _isCellInDragRange,
+            requestedFocusRowIndex: requestedFocusRowIndex,
+            requestedFocusMonthIndex: requestedFocusMonthIndex,
+            onDirectionalKey: _handleDirectionalKey,
           );
         })
         .toList();
@@ -1066,6 +1128,9 @@ class _EditableTableRow extends StatelessWidget {
     required this.onDragHandle,
     required this.onDragHandleEnd,
     required this.isCellInDragRange,
+    required this.requestedFocusRowIndex,
+    required this.requestedFocusMonthIndex,
+    required this.onDirectionalKey,
   });
 
   final int rowIndex;
@@ -1084,6 +1149,10 @@ class _EditableTableRow extends StatelessWidget {
   final void Function(double dx, double dy) onDragHandle;
   final VoidCallback onDragHandleEnd;
   final bool Function(int r, int c) isCellInDragRange;
+
+  final int? requestedFocusRowIndex;
+  final int? requestedFocusMonthIndex;
+  final void Function(int rowIndex, int monthIndex, LogicalKeyboardKey key) onDirectionalKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1129,6 +1198,7 @@ class _EditableTableRow extends StatelessWidget {
                 : (isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor);
 
         final cellValueKey = '$inputResetVersion-$dragFillVersion-$rowIndex-$monthIndex';
+        final isRequestedFocus = requestedFocusRowIndex == rowIndex && requestedFocusMonthIndex == monthIndex;
 
         return _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
@@ -1152,6 +1222,8 @@ class _EditableTableRow extends StatelessWidget {
             ),
             onCellFocused: onCellFocused,
             onValueChanged: (val) => onValueChanged(rowIndex, monthIndex, val),
+            requestedFocus: isRequestedFocus,
+            onDirectionalKey: (key) => onDirectionalKey(rowIndex, monthIndex, key),
           ),
         );
       }),
@@ -1391,6 +1463,8 @@ class _EditableCell extends StatefulWidget {
     required this.style,
     required this.onCellFocused,
     required this.onValueChanged,
+    required this.requestedFocus,
+    required this.onDirectionalKey,
   });
 
   final int rowIndex;
@@ -1399,6 +1473,8 @@ class _EditableCell extends StatefulWidget {
   final TextStyle style;
   final void Function(int rowIndex, int monthIndex) onCellFocused;
   final void Function(int value) onValueChanged;
+  final bool requestedFocus;
+  final void Function(LogicalKeyboardKey key) onDirectionalKey;
 
   @override
   State<_EditableCell> createState() => _EditableCellState();
@@ -1410,8 +1486,33 @@ class _EditableCellState extends State<_EditableCell> {
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _focusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent) {
+          final key = event.logicalKey;
+          if (key == LogicalKeyboardKey.arrowUp ||
+              key == LogicalKeyboardKey.arrowDown ||
+              key == LogicalKeyboardKey.arrowLeft ||
+              key == LogicalKeyboardKey.arrowRight) {
+            widget.onDirectionalKey(key);
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
     _focusNode.addListener(_onFocusChange);
+    if (widget.requestedFocus) {
+      _requestMyFocus();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_EditableCell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.requestedFocus && !oldWidget.requestedFocus) {
+      _requestMyFocus();
+    }
   }
 
   @override
@@ -1425,6 +1526,14 @@ class _EditableCellState extends State<_EditableCell> {
     if (_focusNode.hasFocus) {
       widget.onCellFocused(widget.rowIndex, widget.monthIndex);
     }
+  }
+
+  void _requestMyFocus() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      }
+    });
   }
 
   @override
