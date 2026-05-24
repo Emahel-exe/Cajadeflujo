@@ -234,6 +234,8 @@ class _CashFlowPageState extends State<CashFlowPage> {
                             );
                           }
                         },
+                        onAddRow: _addNewRow,
+                        onDeleteRow: _deleteRow,
                       ),
                     ),
                   ],
@@ -252,6 +254,91 @@ class _CashFlowPageState extends State<CashFlowPage> {
     setState(() {
       inputResetVersion++;
     });
+  }
+
+  Future<void> _addNewRow(CashFlowGroup group) async {
+    final groupTypeString = switch (group) {
+      CashFlowGroup.income => 'income',
+      CashFlowGroup.fixedExpense => 'fixedExpense',
+      CashFlowGroup.variableExpense => 'variableExpense',
+    };
+
+    final groupLabel = switch (group) {
+      CashFlowGroup.income => 'Ingreso',
+      CashFlowGroup.fixedExpense => 'Gasto Fijo',
+      CashFlowGroup.variableExpense => 'Gasto Variable',
+    };
+
+    final textController = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            'Agregar nuevo $groupLabel',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: TextField(
+            controller: textController,
+            autofocus: true,
+            decoration: const InputDecoration(
+              hintText: 'Nombre (ej: Sueldo, Comida...)',
+              hintStyle: TextStyle(color: Colors.grey),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(textController.text.trim()),
+              child: const Text('Agregar', style: TextStyle(color: Color(0xFF36D399))),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (name != null && name.isNotEmpty) {
+      await DatabaseHelper.instance.insertRow(name, groupTypeString);
+      await _loadData(showSpinner: false);
+    }
+  }
+
+  Future<void> _deleteRow(int rowIndex) async {
+    final row = rows[rowIndex];
+    final rowId = row.id;
+    if (rowId == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'Confirmar eliminación',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          content: Text('¿Estás seguro de que deseas eliminar "${row.label}"?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await DatabaseHelper.instance.deleteRow(rowId);
+      await _loadData(showSpinner: false);
+    }
   }
 
   List<int> _monthlyTotals(CashFlowGroup group) {
@@ -620,6 +707,8 @@ class _CashFlowTable extends StatefulWidget {
     required this.inputResetVersion,
     required this.onValueChanged,
     required this.onControlValueChanged,
+    required this.onAddRow,
+    required this.onDeleteRow,
   });
 
   final List<String> months;
@@ -633,6 +722,8 @@ class _CashFlowTable extends StatefulWidget {
   final int inputResetVersion;
   final void Function(int rowIndex, int monthIndex, int value) onValueChanged;
   final void Function(int rowIndex, int value) onControlValueChanged;
+  final void Function(CashFlowGroup group) onAddRow;
+  final void Function(int rowIndex) onDeleteRow;
 
   @override
   State<_CashFlowTable> createState() => _CashFlowTableState();
@@ -671,9 +762,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
                     months: widget.months,
                     selectedMonthIndex: widget.selectedMonthIndex,
                   ),
-                  const _SectionTitle(
+                  _SectionTitle(
                     title: 'INGRESOS',
-                    color: Color(0xFFE2F0D9),
+                    color: const Color(0xFFE2F0D9),
+                    onAddPressed: () => widget.onAddRow(CashFlowGroup.income),
                   ),
                   ..._rowsFor(CashFlowGroup.income),
                   _TotalRow(
@@ -683,9 +775,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
                     color: const Color(0xFFDDEBF7),
                     selectedMonthIndex: widget.selectedMonthIndex,
                   ),
-                  const _SectionTitle(
+                  _SectionTitle(
                     title: 'GASTOS FIJOS',
-                    color: Color(0xFFFFF2CC),
+                    color: const Color(0xFFFFF2CC),
+                    onAddPressed: () => widget.onAddRow(CashFlowGroup.fixedExpense),
                   ),
                   ..._rowsFor(CashFlowGroup.fixedExpense),
                   _TotalRow(
@@ -695,9 +788,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
                     color: const Color(0xFFDDEBF7),
                     selectedMonthIndex: widget.selectedMonthIndex,
                   ),
-                  const _SectionTitle(
+                  _SectionTitle(
                     title: 'GASTOS VARIABLES',
-                    color: Color(0xFFFCE4D6),
+                    color: const Color(0xFFFCE4D6),
+                    onAddPressed: () => widget.onAddRow(CashFlowGroup.variableExpense),
                   ),
                   ..._rowsFor(CashFlowGroup.variableExpense),
                   _TotalRow(
@@ -748,6 +842,7 @@ class _CashFlowTableState extends State<_CashFlowTable> {
             inputResetVersion: widget.inputResetVersion,
             onValueChanged: widget.onValueChanged,
             onControlValueChanged: widget.onControlValueChanged,
+            onDeleteRow: widget.onDeleteRow,
           );
         })
         .toList();
@@ -866,26 +961,54 @@ class _HeaderRow extends StatelessWidget {
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.color});
+  const _SectionTitle({
+    required this.title,
+    required this.color,
+    required this.onAddPressed,
+  });
 
   final String title;
   final Color color;
+  final VoidCallback onAddPressed;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 24,
       width: double.infinity,
-      color: color,
+      decoration: BoxDecoration(
+        color: color,
+        border: Border.all(color: Colors.black, width: 0.7),
+      ),
       alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 10),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Color(0xFF111111),
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Row(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onAddPressed,
+              child: const Padding(
+                padding: EdgeInsets.only(right: 8),
+                child: Icon(
+                  Icons.add,
+                  size: 16,
+                  color: Color(0xFF111111),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF111111),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -900,6 +1023,7 @@ class _EditableTableRow extends StatelessWidget {
     required this.inputResetVersion,
     required this.onValueChanged,
     required this.onControlValueChanged,
+    required this.onDeleteRow,
   });
 
   final int rowIndex;
@@ -909,6 +1033,7 @@ class _EditableTableRow extends StatelessWidget {
   final int inputResetVersion;
   final void Function(int rowIndex, int monthIndex, int value) onValueChanged;
   final void Function(int rowIndex, int value) onControlValueChanged;
+  final void Function(int rowIndex) onDeleteRow;
 
   @override
   Widget build(BuildContext context) {
@@ -917,13 +1042,32 @@ class _EditableTableRow extends StatelessWidget {
         _TableCell(
           width: _CashFlowPageState.categoryColumnWidth,
           color: rowColor,
-          child: Text(
-            row.label,
-            style: const TextStyle(
-              color: Color(0xFF111111),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  row.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () => onDeleteRow(rowIndex),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 4),
+                  child: Icon(
+                    Icons.close,
+                    size: 14,
+                    color: Color(0x99111111),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         ...List.generate(row.values.length, (monthIndex) {

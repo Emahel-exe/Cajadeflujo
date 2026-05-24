@@ -25,9 +25,18 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('DROP TABLE IF EXISTS parameters');
+      await db.execute('DROP TABLE IF EXISTS cash_flow_rows');
+      await _createDB(db, newVersion);
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -70,73 +79,6 @@ class DatabaseHelper {
         control_value INTEGER DEFAULT 0
       )
     ''');
-
-    // Insert default categories/rows matching the initial layout
-    final defaultRows = [
-      {
-        'label': 'Sueldo',
-        'group_type': 'income',
-        'values': [1850000, 1850000, 1850000, 1850000, 1900000, 1900000, 1900000, 1900000, 1950000, 1950000, 1950000, 1950000]
-      },
-      {
-        'label': 'Freelance / otros',
-        'group_type': 'income',
-        'values': [250000, 180000, 300000, 220000, 250000, 280000, 260000, 300000, 320000, 280000, 300000, 350000]
-      },
-      {
-        'label': 'Arriendo / dividendo',
-        'group_type': 'fixedExpense',
-        'values': List.filled(12, 620000)
-      },
-      {
-        'label': 'Servicios basicos',
-        'group_type': 'fixedExpense',
-        'values': List.filled(12, 95000)
-      },
-      {
-        'label': 'Internet y telefono',
-        'group_type': 'fixedExpense',
-        'values': List.filled(12, 54000)
-      },
-      {
-        'label': 'Seguros / suscripciones',
-        'group_type': 'fixedExpense',
-        'values': List.filled(12, 78000)
-      },
-      {
-        'label': 'Transporte',
-        'group_type': 'variableExpense',
-        'values': [120000, 115000, 130000, 125000, 110000, 120000, 135000, 140000, 125000, 120000, 130000, 150000]
-      },
-      {
-        'label': 'Comida',
-        'group_type': 'variableExpense',
-        'values': [360000, 340000, 380000, 370000, 365000, 390000, 410000, 400000, 380000, 390000, 420000, 460000]
-      },
-      {
-        'label': 'Salud',
-        'group_type': 'variableExpense',
-        'values': [40000, 55000, 35000, 80000, 45000, 50000, 65000, 45000, 55000, 70000, 50000, 60000]
-      },
-      {
-        'label': 'Ocio / regalos',
-        'group_type': 'variableExpense',
-        'values': [90000, 120000, 110000, 95000, 100000, 130000, 150000, 135000, 120000, 125000, 160000, 220000]
-      },
-    ];
-
-    for (final row in defaultRows) {
-      final values = row['values'] as List<int>;
-      final map = {
-        'label': row['label'] as String,
-        'group_type': row['group_type'] as String,
-        'control_value': 0,
-      };
-      for (var i = 0; i < 12; i++) {
-        map['val_$i'] = values[i];
-      }
-      await db.insert('cash_flow_rows', map);
-    }
   }
 
   // Load all parameters
@@ -212,5 +154,29 @@ class DatabaseHelper {
       }
       await txn.update('cash_flow_rows', updateMap);
     });
+  }
+
+  // Insert a new row
+  Future<int> insertRow(String label, String groupType) async {
+    final db = await instance.database;
+    final map = {
+      'label': label,
+      'group_type': groupType,
+      'control_value': 0,
+    };
+    for (var i = 0; i < 12; i++) {
+      map['val_$i'] = 0;
+    }
+    return await db.insert('cash_flow_rows', map);
+  }
+
+  // Delete a row
+  Future<int> deleteRow(int id) async {
+    final db = await instance.database;
+    return await db.delete(
+      'cash_flow_rows',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }
