@@ -484,7 +484,7 @@ class _MiniInput extends StatelessWidget {
     return SizedBox(
       height: 38,
       child: TextFormField(
-        initialValue: initialValue.toString(),
+        initialValue: initialValue == 0 ? '' : initialValue.toString(),
         textAlign: TextAlign.right,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
@@ -503,6 +503,11 @@ class _MiniInput extends StatelessWidget {
             borderSide: const BorderSide(color: Color(0xFF36D399), width: 2),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+          hintText: '0',
+          hintStyle: const TextStyle(
+            color: Color(0x6694A3B8),
+            fontSize: 12,
+          ),
         ),
         style: const TextStyle(fontSize: 12),
         cursorColor: const Color(0xFF36D399),
@@ -969,7 +974,9 @@ class _EditableTableRow extends StatelessWidget {
             color: isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor,
             child: TextFormField(
               key: ValueKey('$inputResetVersion-$rowIndex-$monthIndex'),
-              initialValue: row.values[monthIndex].toString(),
+              initialValue: row.values[monthIndex] == 0
+                  ? ''
+                  : row.values[monthIndex].toString(),
               textAlign: TextAlign.right,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
@@ -978,6 +985,11 @@ class _EditableTableRow extends StatelessWidget {
                 contentPadding: EdgeInsets.symmetric(
                   horizontal: 4,
                   vertical: 8,
+                ),
+                hintText: '0',
+                hintStyle: TextStyle(
+                  color: Color(0x66111111),
+                  fontSize: 12,
                 ),
               ),
               style: TextStyle(
@@ -1000,13 +1012,20 @@ class _EditableTableRow extends StatelessWidget {
           color: const Color(0xFFD9EAD3),
           child: TextFormField(
             key: ValueKey('$inputResetVersion-$rowIndex-control'),
-            initialValue: row.controlValue.toString(),
+            initialValue: row.controlValue == 0
+                ? ''
+                : row.controlValue.toString(),
             textAlign: TextAlign.right,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
               border: InputBorder.none,
               isDense: true,
               contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+              hintText: '0',
+              hintStyle: TextStyle(
+                color: Color(0x66111111),
+                fontSize: 12,
+              ),
             ),
             style: const TextStyle(
               color: Color(0xFF111111),
