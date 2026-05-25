@@ -739,7 +739,11 @@ class _CashFlowTableState extends State<_CashFlowTable> {
     return indices;
   }
 
-  void _handleDirectionalKey(int rowIndex, int monthIndex, LogicalKeyboardKey key) {
+  void _handleDirectionalKey(
+    int rowIndex,
+    int monthIndex,
+    LogicalKeyboardKey key,
+  ) {
     final visualIndices = _visualRowIndices;
     final currentVisualRow = visualIndices.indexOf(rowIndex);
     if (currentVisualRow == -1) return;
@@ -780,7 +784,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
     int rowsDragged = (dy / 24.0).round();
 
     int targetMonth = (activeMonthIndex! + colsDragged).clamp(0, 11);
-    int targetRow = (activeRowIndex! + rowsDragged).clamp(0, widget.rows.length - 1);
+    int targetRow = (activeRowIndex! + rowsDragged).clamp(
+      0,
+      widget.rows.length - 1,
+    );
 
     setState(() {
       if (colsDragged.abs() >= rowsDragged.abs()) {
@@ -794,8 +801,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
   }
 
   void _handleDragEnd() {
-    if (activeRowIndex == null || activeMonthIndex == null ||
-        dragEndRowIndex == null || dragEndMonthIndex == null) {
+    if (activeRowIndex == null ||
+        activeMonthIndex == null ||
+        dragEndRowIndex == null ||
+        dragEndMonthIndex == null) {
       return;
     }
 
@@ -823,8 +832,10 @@ class _CashFlowTableState extends State<_CashFlowTable> {
   }
 
   bool _isCellInDragRange(int r, int c) {
-    if (activeRowIndex == null || activeMonthIndex == null ||
-        dragEndRowIndex == null || dragEndMonthIndex == null) {
+    if (activeRowIndex == null ||
+        activeMonthIndex == null ||
+        dragEndRowIndex == null ||
+        dragEndMonthIndex == null) {
       return false;
     }
     if (dragEndMonthIndex != activeMonthIndex) {
@@ -1152,7 +1163,8 @@ class _EditableTableRow extends StatelessWidget {
 
   final int? requestedFocusRowIndex;
   final int? requestedFocusMonthIndex;
-  final void Function(int rowIndex, int monthIndex, LogicalKeyboardKey key) onDirectionalKey;
+  final void Function(int rowIndex, int monthIndex, LogicalKeyboardKey key)
+  onDirectionalKey;
 
   @override
   Widget build(BuildContext context) {
@@ -1188,17 +1200,21 @@ class _EditableTableRow extends StatelessWidget {
       ),
       ...List.generate(row.values.length, (monthIndex) {
         final isSelectedMonth = monthIndex == selectedMonthIndex;
-        final isActiveCell = activeRowIndex == rowIndex && activeMonthIndex == monthIndex;
+        final isActiveCell =
+            activeRowIndex == rowIndex && activeMonthIndex == monthIndex;
         final isInDragRange = isCellInDragRange(rowIndex, monthIndex);
 
         final cellColor = isActiveCell
             ? (isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor)
             : isInDragRange
-                ? const Color(0xFFC8E6C9)
-                : (isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor);
+            ? const Color(0xFFC8E6C9)
+            : (isSelectedMonth ? const Color(0xFFFFEB3B) : rowColor);
 
-        final cellValueKey = '$inputResetVersion-$dragFillVersion-$rowIndex-$monthIndex';
-        final isRequestedFocus = requestedFocusRowIndex == rowIndex && requestedFocusMonthIndex == monthIndex;
+        final cellValueKey =
+            '$inputResetVersion-$dragFillVersion-$rowIndex-$monthIndex';
+        final isRequestedFocus =
+            requestedFocusRowIndex == rowIndex &&
+            requestedFocusMonthIndex == monthIndex;
 
         return _TableCell(
           width: _CashFlowPageState.monthColumnWidth,
@@ -1212,7 +1228,8 @@ class _EditableTableRow extends StatelessWidget {
             monthIndex: monthIndex,
             initialValue: row.values[monthIndex],
             style: TextStyle(
-              color: ((row.group == CashFlowGroup.fixedExpense ||
+              color:
+                  ((row.group == CashFlowGroup.fixedExpense ||
                           row.group == CashFlowGroup.variableExpense) &&
                       row.values[monthIndex] != 0)
                   ? const Color(0xFFC00000)
@@ -1223,7 +1240,8 @@ class _EditableTableRow extends StatelessWidget {
             onCellFocused: onCellFocused,
             onValueChanged: (val) => onValueChanged(rowIndex, monthIndex, val),
             requestedFocus: isRequestedFocus,
-            onDirectionalKey: (key) => onDirectionalKey(rowIndex, monthIndex, key),
+            onDirectionalKey: (key) =>
+                onDirectionalKey(rowIndex, monthIndex, key),
           ),
         );
       }),
@@ -1245,7 +1263,8 @@ class _EditableTableRow extends StatelessWidget {
             hintStyle: TextStyle(color: Color(0x66111111), fontSize: 12),
           ),
           style: TextStyle(
-            color: ((row.group == CashFlowGroup.fixedExpense ||
+            color:
+                ((row.group == CashFlowGroup.fixedExpense ||
                         row.group == CashFlowGroup.variableExpense) &&
                     row.controlValue != 0)
                 ? const Color(0xFFC00000)
@@ -1413,7 +1432,10 @@ class _TableCell extends StatelessWidget {
             bottom: -3,
             child: GestureDetector(
               onPanUpdate: (details) {
-                onDragHandle!(details.localPosition.dx, details.localPosition.dy);
+                onDragHandle!(
+                  details.localPosition.dx,
+                  details.localPosition.dy,
+                );
               },
               onPanEnd: (_) {
                 if (onDragHandleEnd != null) onDragHandleEnd!();
@@ -1540,7 +1562,9 @@ class _EditableCellState extends State<_EditableCell> {
   Widget build(BuildContext context) {
     return TextFormField(
       focusNode: _focusNode,
-      initialValue: widget.initialValue == 0 ? '' : widget.initialValue.toString(),
+      initialValue: widget.initialValue == 0
+          ? ''
+          : widget.initialValue.toString(),
       textAlign: TextAlign.right,
       keyboardType: TextInputType.number,
       decoration: const InputDecoration(
